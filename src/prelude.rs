@@ -4,19 +4,6 @@ use crate::ptrace;
 use std::{os::unix::process::CommandExt, process::Command};
 
 pub fn launch_traceable(mut command: Command) -> Result<i32, i32> {
-    // -> never
-    // -> bool
-    // ls -l
-    //
-
-    //
-    // let x = match T {
-    //  => never
-    //  => i32
-    //}
-    //
-    // FOrk
-
     match fork::fork()? {
         fork::Fork::Parent(child_pid) => Ok(child_pid),
         fork::Fork::Child => {
@@ -27,3 +14,6 @@ pub fn launch_traceable(mut command: Command) -> Result<i32, i32> {
         }
     }
 }
+
+// R
+// [P, C]
