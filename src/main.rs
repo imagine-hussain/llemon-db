@@ -1,11 +1,13 @@
+#![allow(dead_code)]
+
 use std::{
     error::Error,
     io::{self, Write},
     process::Command,
 };
 
-mod prelude;
-mod ptrace;
+pub mod prelude;
+pub mod ptrace;
 
 use prelude::*;
 
