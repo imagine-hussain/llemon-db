@@ -16,6 +16,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let child_pid = launch_traceable(Command::new("./hello")).unwrap();
 
+    let mut debugger = Debugger::from_pid(child_pid);
+
     loop {
         // this is macro cal, not a funciton
         print!(">>> ");
@@ -25,6 +27,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             .expect("Failed to read line");
 
         let line = input.trim();
+        dbg!(line);
+        if line == "run" {
+            debugger.continue_process();
+        }
 
         // io::Result<>
         // foo::Error

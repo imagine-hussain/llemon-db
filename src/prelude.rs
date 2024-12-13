@@ -1,8 +1,8 @@
-use fork;
+use fork::{self, waitpid};
 use libc::{ptrace, PTRACE_PEEKDATA};
 
 use crate::ptrace;
-use std::{ffi::c_void, os::unix::process::CommandExt, process::Command};
+use std::{collections::HashMap, ffi::c_void, os::unix::process::CommandExt, process::Command};
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Pid(pub i32);
@@ -34,7 +34,23 @@ impl Breakpoint {
     /// TODO: Allow arm as well using `cfg` flags
     pub const INT3_INSTRUCTION: u8 = 0xcc;
 
+    pub fn new_enabled(pid: Pid, addr: isize) -> Self {
+        let mut breakpoint = Self {
+            pid,
+            addr,
+            enabled: false,
+            replacing_byte: None,
+        };
+        breakpoint.enable();
+        breakpoint
+    }
+
     pub fn enable(&mut self) {
+        if self.enabled {
+            // This should signal that this already exists
+            return;
+        }
+
         let word_at_addr = ptrace::peekdata(self.pid, self.addr);
 
         let mut bytes_at_addr = word_at_addr.to_le_bytes();
@@ -65,6 +81,45 @@ impl Breakpoint {
         let new_data = i64::from_le_bytes(bytes);
         ptrace::pokedata(self.pid, self.addr, new_data);
     }
+}
+
+pub struct Debugger {
+    pid: Pid,
+    breakpoints: HashMap<isize, Breakpoint>,
+}
+
+impl Debugger {
+    pub fn from_pid(pid: Pid) -> Self {
+        Self {
+            pid,
+            breakpoints: HashMap::default(),
+        }
+    }
+
+    pub fn add_breakpoint_at(&mut self, addr: isize) {
+        self.breakpoints
+            .entry(addr)
+            .and_modify(|b| b.enable())
+            .or_insert_with(|| Breakpoint::new_enabled(self.pid, addr));
+    }
+
+    pub fn continue_process(&mut self) {
+        ptrace::cont(self.pid);
+
+        let mut status: i32 = 0;
+        let res = unsafe { libc::waitpid(self.pid.0, &mut status, 0) };
+        match res {
+            -1 => panic!("Can't wait on pid"),
+            _ => (),
+        };
+    }
+    // void debugger::continue_execution() {
+    //     ptrace(PTRACE_CONT, m_pid, nullptr, nullptr);
+
+    //     int wait_status;
+    //     auto options = 0;
+    //     waitpid(m_pid, &wait_status, options);
+    // }
 }
 
 // R

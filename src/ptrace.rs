@@ -19,4 +19,10 @@ pub fn pokedata(pid: Pid, addr: isize, data: i64) {
     }
 }
 
+pub fn cont(pid: Pid) {
+    unsafe {
+        libc::ptrace(libc::PTRACE_CONT, pid.0, NULLVOID, NULLVOID);
+    }
+}
+
 // hello
