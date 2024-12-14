@@ -4,11 +4,13 @@ use std::{
     error::Error,
     io::{self, Write},
     process::Command,
+    str::FromStr,
 };
 
 pub mod breakpoint;
 pub mod prelude;
 pub mod ptrace;
+pub mod registers;
 
 use prelude::*;
 
@@ -48,6 +50,22 @@ fn main() -> Result<(), Box<dyn Error>> {
                 libc::kill(child_pid.0, libc::SIGKILL);
                 return Ok(());
             },
+            "register" | "reg" => {
+                match inp.next().expect("Need to know if read/write a register") {
+                    "read" | "r" => {
+                        let reg = registers::Register::from_str(inp.next().unwrap())?;
+                        let value = ptrace::get_reg(child_pid, reg)?;
+                        println!("Register has value: {value:x} = {value}");
+                    }
+                    "write" | "w" => {
+                        let reg = registers::Register::from_str(inp.next().unwrap())?;
+                        let value_str = inp.next().unwrap();
+                        let value: u64 = value_str.parse()?;
+                        ptrace::set_reg(child_pid, reg, value)?;
+                    }
+                    _ => todo!(),
+                }
+            }
             _ => {
                 println!("Dont know command: {command}");
             }
