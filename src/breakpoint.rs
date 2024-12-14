@@ -52,16 +52,16 @@ impl Breakpoint {
         }
 
         let word_at_addr_with_int3 = i64::from_le_bytes(bytes_at_addr);
-        ptrace::pokedata(self.pid, self.addr, word_at_addr_with_int3);
+        ptrace::pokedata(self.pid, self.addr, word_at_addr_with_int3)?;
 
         self.enabled = true;
 
         Ok(())
     }
 
-    pub fn disable(&mut self) {
+    pub fn disable(&mut self) -> Result<(), ptrace::Error> {
         assert!(self.enabled);
-        let data = ptrace::peekdata(self.pid, self.addr).unwrap();
+        let data = ptrace::peekdata(self.pid, self.addr)?;
         let old_byte = self.replacing_byte.take().expect("Was enabled");
 
         let mut bytes = data.to_le_bytes();
@@ -69,6 +69,8 @@ impl Breakpoint {
             *bytes.get_unchecked_mut(0) = old_byte;
         }
         let new_data = i64::from_le_bytes(bytes);
-        ptrace::pokedata(self.pid, self.addr, new_data);
+        ptrace::pokedata(self.pid, self.addr, new_data)?;
+
+        Ok(())
     }
 }

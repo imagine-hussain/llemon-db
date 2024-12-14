@@ -37,6 +37,7 @@ pub fn trace_me() {
 }
 
 pub fn peekdata(pid: Pid, addr: isize) -> Result<i64, Error> {
+    clear_errno();
     let data = unsafe { libc::ptrace(libc::PTRACE_PEEKDATA, pid.0, addr, NULLVOID) };
     match check_errno() {
         None => Ok(data),
@@ -44,15 +45,21 @@ pub fn peekdata(pid: Pid, addr: isize) -> Result<i64, Error> {
     }
 }
 
-pub fn pokedata(pid: Pid, addr: isize, data: i64) {
-    unsafe {
-        libc::ptrace(libc::PTRACE_POKEDATA, pid, addr, data);
+pub fn pokedata(pid: Pid, addr: isize, data: i64) -> Result<(), Error> {
+    clear_errno();
+    let res = unsafe { libc::ptrace(libc::PTRACE_POKEDATA, pid, addr, data) };
+    match res {
+        -1 => Err(check_errno().unwrap()),
+        _ => Ok(()),
     }
 }
 
-pub fn cont(pid: Pid) {
-    unsafe {
-        libc::ptrace(libc::PTRACE_CONT, pid.0, NULLVOID, NULLVOID);
+pub fn cont(pid: Pid) -> Result<(), Error> {
+    let res = unsafe { libc::ptrace(libc::PTRACE_CONT, pid.0, NULLVOID, NULLVOID) };
+
+    match res {
+        -1 => Err(check_errno().unwrap()),
+        _ => Ok(()),
     }
 }
 

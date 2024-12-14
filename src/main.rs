@@ -37,13 +37,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         };
 
         match command {
-            "run" => debugger.continue_process(),
+            "run" => debugger.continue_process().unwrap(),
             "break" => {
                 let addr_raw = inp.next().expect("Give address");
                 let addr = isize::from_str_radix(addr_raw, 16).unwrap();
 
                 debugger.add_breakpoint_at(addr).unwrap();
             }
+            "exit" => unsafe {
+                libc::kill(child_pid.0, libc::SIGKILL);
+                return Ok(());
+            },
             _ => {
                 println!("Dont know command: {command}");
             }

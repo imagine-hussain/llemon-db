@@ -41,8 +41,8 @@ impl Debugger {
         breakpoint.enable()
     }
 
-    pub fn continue_process(&mut self) {
-        ptrace::cont(self.pid);
+    pub fn continue_process(&mut self) -> Result<(), ptrace::Error> {
+        ptrace::cont(self.pid)?;
 
         let mut status: i32 = 0;
         let res = unsafe { libc::waitpid(self.pid.0, &mut status, 0) };
@@ -50,6 +50,8 @@ impl Debugger {
             -1 => panic!("Can't wait on pid"),
             _ => (),
         };
+
+        Ok(())
     }
     // void debugger::continue_execution() {
     //     ptrace(PTRACE_CONT, m_pid, nullptr, nullptr);
