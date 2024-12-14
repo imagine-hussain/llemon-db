@@ -102,6 +102,16 @@ pub fn get_reg(pid: Pid, reg: Register) -> Result<u64, Error> {
     Ok(*reg.extract_from_reg_struct(&regs))
 }
 
+pub fn single_step(pid: Pid) -> Result<(), Error> {
+    unsafe {
+        let res = libc::ptrace(libc::PTRACE_SINGLESTEP, pid.0, NULLVOID, NULLVOID);
+        match res {
+            -1 => Err(check_errno().unwrap()),
+            _ => Ok(()),
+        }
+    }
+}
+
 impl From<i32> for Error {
     fn from(value: i32) -> Self {
         match value {

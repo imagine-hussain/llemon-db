@@ -29,6 +29,10 @@ impl Breakpoint {
         Ok(breakpoint)
     }
 
+    pub fn enabled(&self) -> bool {
+        self.enabled
+    }
+
     pub fn enable(&mut self) -> Result<(), ptrace::Error> {
         if self.enabled {
             // This should signal that this already exists

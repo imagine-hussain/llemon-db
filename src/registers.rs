@@ -39,6 +39,10 @@ pub enum Register {
 impl Register {
     pub const NUM_VARIANTS: usize = 27;
 
+    pub const fn pc() -> Self {
+        Self::RIP
+    }
+
     fn dwarf(&self) -> i32 {
         match self {
             Self::R15 => 15,
@@ -123,6 +127,10 @@ impl Register {
             regs_raw_slice.offset(offset as isize).as_mut().unwrap()
         }
     }
+
+    pub unsafe fn from_u8_unchecked(val: u8) -> Self {
+        std::mem::transmute(val)
+    }
 }
 
 impl FromStr for Register {
@@ -159,5 +167,34 @@ impl FromStr for Register {
             "GS" => Ok(Self::GS),
             _ => Err("No such register"),
         }
+    }
+}
+
+pub fn dump_user_regs(regs: &libc::user_regs_struct) {
+    let regs = regs as *const libc::user_regs_struct;
+    let regs_raw_slice = regs as *const c_ulonglong;
+
+    for i in 0..Register::NUM_VARIANTS {
+        unsafe {
+            let regkind = Register::from_u8_unchecked(i as u8);
+            let reg_value = *regs_raw_slice.offset(i as isize);
+
+            println!("{:?}: {} = 0x{:x}", regkind, reg_value, reg_value)
+        }
+    }
+}
+
+use std::convert::TryFrom;
+
+impl TryFrom<u8> for Register {
+    type Error = &'static str;
+
+    fn try_from(val: u8) -> Result<Self, Self::Error> {
+        if val as usize >= Self::NUM_VARIANTS {
+            return Err("Val is out of range for register");
+        }
+
+        // Safety: Checked that we have a valid tag in range
+        unsafe { Ok(Self::from_u8_unchecked(val)) }
     }
 }

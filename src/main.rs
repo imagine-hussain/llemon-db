@@ -13,6 +13,7 @@ pub mod ptrace;
 pub mod registers;
 
 use prelude::*;
+use registers::dump_user_regs;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut input = String::new();
@@ -49,26 +50,26 @@ fn main() -> Result<(), Box<dyn Error>> {
                 libc::kill(child_pid.0, libc::SIGKILL);
                 return Ok(());
             },
-            "register" | "reg" => {
-                match inp.next().expect("Need to know if read/write a register") {
-                    "get" | "read" | "r" => {
-                        let reg = registers::Register::from_str(
-                            inp.next().unwrap().to_uppercase().as_str(),
-                        )?;
-                        let value = ptrace::get_reg(child_pid, reg)?;
-                        println!("Register has value: {value:x} = {value}");
-                    }
-                    "set" | "write" | "w" => {
-                        let reg = registers::Register::from_str(
-                            inp.next().unwrap().to_uppercase().as_str(),
-                        )?;
-                        let value_str = inp.next().unwrap();
-                        let value: u64 = value_str.parse()?;
-                        ptrace::set_reg(child_pid, reg, value)?;
-                    }
-                    _ => todo!(),
+            "register" | "reg" => match inp.next() {
+                Some("get" | "read" | "r") => {
+                    let reg =
+                        registers::Register::from_str(inp.next().unwrap().to_uppercase().as_str())?;
+                    let value = ptrace::get_reg(child_pid, reg)?;
+                    println!("Register has value: {value:x} = {value}");
                 }
-            }
+                Some("set" | "write" | "w") => {
+                    let reg =
+                        registers::Register::from_str(inp.next().unwrap().to_uppercase().as_str())?;
+                    let value_str = inp.next().unwrap();
+                    let value: u64 = value_str.parse()?;
+                    ptrace::set_reg(child_pid, reg, value)?;
+                }
+                None => {
+                    let regs = ptrace::get_regs(child_pid)?;
+                    dump_user_regs(&regs);
+                }
+                _ => todo!("invalid input"),
+            },
             _ => {
                 println!("Dont know command: {command}");
             }
