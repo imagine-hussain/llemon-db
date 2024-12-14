@@ -1,6 +1,12 @@
 #include <stdio.h>
+
+void printhi() {
+    printf("hi\n");
+}
+
 int main() {
+    printf("printhi located at: %p\n", &printhi);
     for (int i = 0; i < 5; ++i)
-        printf("hi\n");
-    return 0;;
+        printhi();
+    return 0;
 }
