@@ -31,7 +31,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .read_line(&mut input)
             .expect("Failed to read line");
 
-        let line = input.trim();
+        let line: &mut str = &mut input;
         let mut inp = line.split_whitespace();
         let command = match inp.next() {
             Some(c) => c,
@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         };
 
         match command {
-            "run" => debugger.continue_process().unwrap(),
+            "continue" | "c" => debugger.continue_process().unwrap(),
             "break" => {
                 let addr_raw = inp.next().expect("Give address");
                 let addr = isize::from_str_radix(addr_raw, 16).unwrap();
@@ -52,13 +52,17 @@ fn main() -> Result<(), Box<dyn Error>> {
             },
             "register" | "reg" => {
                 match inp.next().expect("Need to know if read/write a register") {
-                    "read" | "r" => {
-                        let reg = registers::Register::from_str(inp.next().unwrap())?;
+                    "get" | "read" | "r" => {
+                        let reg = registers::Register::from_str(
+                            inp.next().unwrap().to_uppercase().as_str(),
+                        )?;
                         let value = ptrace::get_reg(child_pid, reg)?;
                         println!("Register has value: {value:x} = {value}");
                     }
-                    "write" | "w" => {
-                        let reg = registers::Register::from_str(inp.next().unwrap())?;
+                    "set" | "write" | "w" => {
+                        let reg = registers::Register::from_str(
+                            inp.next().unwrap().to_uppercase().as_str(),
+                        )?;
                         let value_str = inp.next().unwrap();
                         let value: u64 = value_str.parse()?;
                         ptrace::set_reg(child_pid, reg, value)?;
@@ -70,9 +74,5 @@ fn main() -> Result<(), Box<dyn Error>> {
                 println!("Dont know command: {command}");
             }
         }
-
-        // io::Result<>
-        // foo::Error
-        // foo::Result<T> = Result<T, foo::Error>
     }
 }

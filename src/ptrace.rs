@@ -31,7 +31,7 @@ fn clear_errno() {
 }
 
 fn has_errno() -> bool {
-    return unsafe { *libc::__errno_location() } == 0;
+    unsafe { *libc::__errno_location() == 0 }
 }
 
 pub fn trace_me() {
