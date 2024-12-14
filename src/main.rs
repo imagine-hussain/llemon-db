@@ -23,7 +23,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut debugger = Debugger::from_pid(child_pid);
 
     loop {
-        // this is macro cal, not a funciton
         print!(">>> ");
         input.clear();
         io::stdout().flush()?;
