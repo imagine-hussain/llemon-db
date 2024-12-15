@@ -4,6 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bytemuck = "1.20.0"
 fork = "0.2.0"
+gimli = "0.31.1"
 libc = "0.2.168"
