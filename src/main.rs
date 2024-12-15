@@ -8,6 +8,7 @@ use std::{
 };
 
 pub mod breakpoint;
+pub mod dwarf;
 pub mod prelude;
 pub mod ptrace;
 pub mod registers;
