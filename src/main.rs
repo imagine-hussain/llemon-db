@@ -11,6 +11,7 @@ pub mod breakpoint;
 pub mod prelude;
 pub mod ptrace;
 pub mod registers;
+pub mod target;
 
 use prelude::*;
 use registers::dump_user_regs;
@@ -18,10 +19,9 @@ use registers::dump_user_regs;
 fn main() -> Result<(), Box<dyn Error>> {
     let mut input = String::new();
 
-    let child_pid = launch_traceable(Command::new("./hello")).unwrap();
+    let mut target = launch_traceable(Command::new("./hello")).unwrap();
+    let child_pid = target.pid();
     println!("Attaching to program with pid {}", child_pid.0);
-
-    let mut debugger = Debugger::from_pid(child_pid);
 
     loop {
         print!(">>> ");
@@ -39,12 +39,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         };
 
         match command {
-            "continue" | "c" => debugger.continue_process().unwrap(),
+            "continue" | "c" => target.continue_process().unwrap(),
             "break" => {
                 let addr_raw = inp.next().expect("Give address");
                 let addr = isize::from_str_radix(addr_raw, 16).unwrap();
 
-                debugger.add_breakpoint_at(addr).unwrap();
+                target.add_breakpoint_at(addr).unwrap();
             }
             "exit" => unsafe {
                 libc::kill(child_pid.0, libc::SIGKILL);
@@ -54,12 +54,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 Some("get" | "read" | "r") => {
                     let reg =
                         registers::Register::from_str(inp.next().unwrap().to_uppercase().as_str())?;
+
                     let value = ptrace::get_reg(child_pid, reg)?;
                     println!("Register has value: {value:x} = {value}");
                 }
                 Some("set" | "write" | "w") => {
                     let reg =
                         registers::Register::from_str(inp.next().unwrap().to_uppercase().as_str())?;
+
                     let value_str = inp.next().unwrap();
                     let value: u64 = value_str.parse()?;
                     ptrace::set_reg(child_pid, reg, value)?;

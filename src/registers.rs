@@ -124,10 +124,13 @@ impl Register {
         let regs_raw_slice = regs as *mut c_ulonglong;
         unsafe {
             let offset = *self as u8;
-            regs_raw_slice.offset(offset as isize).as_mut().unwrap()
+            regs_raw_slice.add(offset as usize).as_mut().unwrap()
         }
     }
 
+    /// # Safety
+    /// Ensure that val in [0..Self::NUM_VARIANTS), else this will
+    /// have a malformed value
     pub unsafe fn from_u8_unchecked(val: u8) -> Self {
         std::mem::transmute(val)
     }
@@ -138,33 +141,33 @@ impl FromStr for Register {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "R15" => Ok(Self::R15),
-            "R14" => Ok(Self::R14),
-            "R13" => Ok(Self::R13),
-            "R12" => Ok(Self::R12),
-            "RBP" => Ok(Self::RBP),
-            "RBX" => Ok(Self::RBX),
-            "R11" => Ok(Self::R11),
-            "R10" => Ok(Self::R10),
-            "R9" => Ok(Self::R9),
-            "R8" => Ok(Self::R8),
-            "RAX" => Ok(Self::RAX),
-            "RCX" => Ok(Self::RCX),
-            "RDX" => Ok(Self::RDX),
-            "RSI" => Ok(Self::RSI),
-            "RDI" => Ok(Self::RDI),
-            "ORIGRAX" => Ok(Self::ORIGRAX),
-            "RIP" => Ok(Self::RIP),
-            "CS" => Ok(Self::CS),
-            "RFLAGS" => Ok(Self::RFLAGS),
-            "RSP" => Ok(Self::RSP),
-            "SS" => Ok(Self::SS),
-            "FSBASE" => Ok(Self::FSBASE),
-            "GSBASE" => Ok(Self::GSBASE),
-            "DS" => Ok(Self::DS),
-            "ES" => Ok(Self::ES),
-            "FS" => Ok(Self::FS),
-            "GS" => Ok(Self::GS),
+            "R15" | "r15" => Ok(Self::R15),
+            "R14" | "r14" => Ok(Self::R14),
+            "R13" | "r13" => Ok(Self::R13),
+            "R12" | "r12" => Ok(Self::R12),
+            "RBP" | "rbp" => Ok(Self::RBP),
+            "RBX" | "rbx" => Ok(Self::RBX),
+            "R11" | "r11" => Ok(Self::R11),
+            "R10" | "r10" => Ok(Self::R10),
+            "R9" | "r9" => Ok(Self::R9),
+            "R8" | "r8" => Ok(Self::R8),
+            "RAX" | "rax" => Ok(Self::RAX),
+            "RCX" | "rcx" => Ok(Self::RCX),
+            "RDX" | "rdx" => Ok(Self::RDX),
+            "RSI" | "rsi" => Ok(Self::RSI),
+            "RDI" | "rdi" => Ok(Self::RDI),
+            "ORIGRAX" | "origrax" => Ok(Self::ORIGRAX),
+            "RIP" | "rip" => Ok(Self::RIP),
+            "CS" | "cs" => Ok(Self::CS),
+            "RFLAGS" | "rflags" => Ok(Self::RFLAGS),
+            "RSP" | "rsp" => Ok(Self::RSP),
+            "SS" | "ss" => Ok(Self::SS),
+            "FSBASE" | "fsbase" => Ok(Self::FSBASE),
+            "GSBASE" | "gsbase" => Ok(Self::GSBASE),
+            "DS" | "ds" => Ok(Self::DS),
+            "ES" | "es" => Ok(Self::ES),
+            "FS" | "fs" => Ok(Self::FS),
+            "GS" | "gs" => Ok(Self::GS),
             _ => Err("No such register"),
         }
     }
@@ -177,7 +180,7 @@ pub fn dump_user_regs(regs: &libc::user_regs_struct) {
     for i in 0..Register::NUM_VARIANTS {
         unsafe {
             let regkind = Register::from_u8_unchecked(i as u8);
-            let reg_value = *regs_raw_slice.offset(i as isize);
+            let reg_value = *regs_raw_slice.add(i);
 
             println!("{:?}: {} = 0x{:x}", regkind, reg_value, reg_value)
         }

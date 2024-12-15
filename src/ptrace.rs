@@ -30,7 +30,7 @@ fn clear_errno() {
     };
 }
 
-fn has_errno() -> bool {
+pub fn has_errno() -> bool {
     unsafe { *libc::__errno_location() == 0 }
 }
 
