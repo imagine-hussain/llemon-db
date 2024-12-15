@@ -73,6 +73,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
                 _ => todo!("invalid input"),
             },
+            "read" | "p" => {
+                // read <addr>(:<type>)
+            }
+            "write" => {
+                // write addr(:type) value
+                // write 0x1000 10
+                // write 0x1000:u8 10
+            }
             _ => {
                 println!("Dont know command: {command}");
             }

@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use libc::size_t;
+
 use crate::breakpoint::Breakpoint;
 use crate::prelude::*;
 use crate::ptrace;
@@ -57,6 +59,14 @@ impl Target {
             .enable()?;
 
         Ok(())
+    }
+
+    pub fn read_word(&mut self, addr: isize) -> Result<i64, ptrace::Error> {
+        ptrace::peekdata(self.pid, addr)
+    }
+
+    pub fn write_word(&mut self, addr: isize, data: i64) -> Result<(), ptrace::Error> {
+        ptrace::pokedata(self.pid, addr, data)
     }
 
     fn wait_signal(&self) {

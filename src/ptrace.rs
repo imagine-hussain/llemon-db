@@ -16,6 +16,25 @@ pub enum Error {
 
 impl std::error::Error for Error {}
 
+impl From<i32> for Error {
+    fn from(value: i32) -> Self {
+        match value {
+            libc::EIO => Self::EIO,
+            libc::ESRCH => Self::EIO,
+            e => panic!("Not a handled error code for ptrace: {e}"),
+        }
+    }
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::NoSuchProcess => write!(f, "NoSuchProcess"),
+            Error::EIO => write!(f, "EIO"),
+        }
+    }
+}
+
 fn check_errno() -> Option<Error> {
     let errno: i32 = unsafe { *libc::__errno_location() };
     match errno {
@@ -108,25 +127,6 @@ pub fn single_step(pid: Pid) -> Result<(), Error> {
         match res {
             -1 => Err(check_errno().unwrap()),
             _ => Ok(()),
-        }
-    }
-}
-
-impl From<i32> for Error {
-    fn from(value: i32) -> Self {
-        match value {
-            libc::EIO => Self::EIO,
-            libc::ESRCH => Self::EIO,
-            e => panic!("Not a handled error code for ptrace: {e}"),
-        }
-    }
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::NoSuchProcess => write!(f, "NoSuchProcess"),
-            Error::EIO => write!(f, "EIO"),
         }
     }
 }

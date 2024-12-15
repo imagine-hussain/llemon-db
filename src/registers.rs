@@ -157,7 +157,7 @@ impl FromStr for Register {
             "RSI" | "rsi" => Ok(Self::RSI),
             "RDI" | "rdi" => Ok(Self::RDI),
             "ORIGRAX" | "origrax" => Ok(Self::ORIGRAX),
-            "RIP" | "rip" => Ok(Self::RIP),
+            "RIP" | "rip" | "PC" | "pc" => Ok(Self::RIP),
             "CS" | "cs" => Ok(Self::CS),
             "RFLAGS" | "rflags" => Ok(Self::RFLAGS),
             "RSP" | "rsp" => Ok(Self::RSP),
