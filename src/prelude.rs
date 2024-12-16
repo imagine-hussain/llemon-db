@@ -26,3 +26,51 @@ pub fn wait_for_signal(pid: Pid) {
         libc::waitpid(pid.0, &mut status as *mut i32, options);
     }
 }
+
+#[macro_export]
+macro_rules! peektype_and_print {
+    ($typename:expr, $pid:expr, $addr:expr, $($ty:ty), *) => { 
+        {
+            let pid = $pid;
+            let addr = $addr;
+
+            match $typename {
+                $(
+                    stringify!($ty) => {
+                        let val: $ty = ptrace::peekdata_as(pid, addr).unwrap();
+                        println!("{val}");
+                    }
+                ),*
+                provided_typename => {
+                    println!("Invalid typename: {}", provided_typename);
+                }
+            }
+        }
+    };
+
+}
+
+#[macro_export]
+macro_rules! parsetype_and_poke {
+    ($value_str:expr, $typename:expr, $pid:expr, $addr:expr, $($ty:ty), *) => { 
+        {
+            let pid = $pid;
+            let addr = $addr;
+            let value_str = $value_str;
+
+            match $typename {
+                $(
+                    stringify!($ty) => {
+                        let val: $ty = value_str.parse().unwrap();
+                        ptrace::pokedata_as(pid, addr, &val)?;
+                        println!("Succesfully wrote to {}", addr);
+                    }
+                ),*
+                provided_typename => {
+                    println!("Invalid typename: {}", provided_typename);
+                }
+            }
+        }
+    };
+
+}

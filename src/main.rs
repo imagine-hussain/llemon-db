@@ -1,10 +1,7 @@
 #![allow(dead_code)]
 
 use std::{
-    error::Error,
-    io::{self, Write},
-    process::Command,
-    str::FromStr,
+    any::type_name, error::Error, io::{self, Write}, process::Command, str::FromStr
 };
 
 pub mod breakpoint;
@@ -15,6 +12,7 @@ pub mod registers;
 pub mod target;
 
 use prelude::*;
+use ptrace::peekdata;
 use registers::dump_user_regs;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -73,13 +71,36 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
                 _ => todo!("invalid input"),
             },
-            "read" | "p" => {
-                // read <addr>(:<type>)
-            }
+            "read" => {
+                // read <addr>(:<type>)?
+                let addr_and_type = inp.next().expect("Give address, optionally give a type");
+                let (addr_str, typename) = match addr_and_type.split_once(':') {
+                    Some((addr, ty)) => (addr, ty),
+                    None => (addr_and_type, "i64"),
+                };
+                let addr: isize = addr_str.parse()?;
+
+                peektype_and_print!(
+                    typename, child_pid, addr,
+                    i32, u32, i64, u64, char, bool, u8, i8, usize, isize, i16, u16,
+                    f32, f64, i128, u128
+                );
+            },
             "write" => {
-                // write addr(:type) value
-                // write 0x1000 10
-                // write 0x1000:u8 10
+                // write <addr>(:type)? <value>
+                let addr_and_type = inp.next().expect("Give address, optionally give a type");
+                let (addr_str, typename) = match addr_and_type.split_once(':') {
+                    Some((addr, ty)) => (addr, ty),
+                    None => (addr_and_type, "i64"),
+                };
+                let addr: isize = addr_str.parse()?;
+                let value_str = inp.next().unwrap();
+
+                parsetype_and_poke!(
+                    value_str, typename, child_pid, addr,
+                    i32, u32, i64, u64, char, bool, u8, i8, usize, isize, i16, u16,
+                    f32, f64, i128, u128
+                );
             }
             _ => {
                 println!("Dont know command: {command}");

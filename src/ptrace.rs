@@ -68,6 +68,46 @@ pub fn peekdata(pid: Pid, addr: isize) -> Result<i64, Error> {
     }
 }
 
+
+pub fn peekdata_slice(pid: Pid, mut addr: isize, data: &mut [u8]) -> Result<(), Error> {
+    let mut remaining = data;
+
+    while !remaining.is_empty() {
+        let word_at_addr: i64 = peekdata(pid, addr)?;
+        let mut word_as_slice: [u8; 8] = word_at_addr.to_ne_bytes();
+
+        let bytes_to_copy = remaining.len().min(8);
+        let src_buf = &mut word_as_slice[..bytes_to_copy];
+
+        for (dest, src) in remaining.iter_mut().zip(src_buf) {
+            *dest = *src;
+        }
+
+        remaining = &mut remaining[bytes_to_copy..];
+        addr += bytes_to_copy as isize;
+    }
+
+    Ok(())
+}
+
+pub fn peekdata_as<T: Sized>(pid: Pid, addr: isize) -> Result<T, Error> {
+    let len: usize = std::mem::size_of::<T>();
+    let mut t = MaybeUninit::<T>::uninit();
+    
+    // # Safety:
+    // The pointer for `from_raw_parts_mut` is constructed off a local
+    // Sized variable and is valid.
+    unsafe {
+        let data: &mut [u8] = std::slice::from_raw_parts_mut(t.as_mut_ptr() as *mut u8, len);
+        peekdata_slice(pid, addr, data)?;
+    };
+    
+    unsafe {
+        Ok(t.assume_init())
+    }
+}
+
+
 pub fn pokedata(pid: Pid, addr: isize, data: i64) -> Result<(), Error> {
     clear_errno();
     let res = unsafe { libc::ptrace(libc::PTRACE_POKEDATA, pid, addr, data) };
@@ -76,6 +116,49 @@ pub fn pokedata(pid: Pid, addr: isize, data: i64) -> Result<(), Error> {
         _ => Ok(()),
     }
 }
+
+
+pub fn pokedata_slice(pid: Pid, mut addr: isize, data: &[u8]) -> Result<(), Error> {
+    let mut remaining = data;
+
+    while !remaining.is_empty() {
+        let bytes_to_copy = remaining.len().min(8);
+
+        if bytes_to_copy == 8 {
+            pokedata(pid, addr, remaining.as_ptr() as i64)?;
+        }
+        else {
+            let word_at_addr: i64 = peekdata(pid, addr)?;
+            let mut word_as_slice: [u8; 8] = word_at_addr.to_ne_bytes();
+
+            let dest_buf = &mut word_as_slice[..bytes_to_copy];
+
+            for (src, dest) in remaining.iter().zip(dest_buf) {
+                *dest = *src;
+            }
+
+            let written_data = i64::from_ne_bytes(word_as_slice);
+            pokedata(pid, addr, written_data)?;
+        }
+
+        remaining = &remaining[bytes_to_copy..];
+        addr += bytes_to_copy as isize;
+    }
+
+    Ok(())
+}
+
+pub fn pokedata_as<T: Sized>(pid: Pid, addr: isize, data: &T) -> Result<(), Error> {
+    let len = std::mem::size_of::<T>();
+    let data_slice = unsafe {
+        let underlying = data as *const T as *const u8;
+        std::slice::from_raw_parts(underlying, len)
+    };
+
+    pokedata_slice(pid, addr, data_slice)?;
+    Ok(())
+}
+
 
 pub fn cont(pid: Pid) -> Result<(), Error> {
     let res = unsafe { libc::ptrace(libc::PTRACE_CONT, pid.0, NULLVOID, NULLVOID) };
