@@ -29,7 +29,7 @@ pub fn wait_for_signal(pid: Pid) {
 
 #[macro_export]
 macro_rules! peektype_and_print {
-    ($typename:expr, $pid:expr, $addr:expr, $($ty:ty), *) => { 
+    ($typename:expr, $pid:expr, $addr:expr, $($ty:ty), *) => {
         {
             let pid = $pid;
             let addr = $addr;
@@ -52,7 +52,7 @@ macro_rules! peektype_and_print {
 
 #[macro_export]
 macro_rules! parsetype_and_poke {
-    ($value_str:expr, $typename:expr, $pid:expr, $addr:expr, $($ty:ty), *) => { 
+    ($value_str:expr, $typename:expr, $pid:expr, $addr:expr, $($ty:ty), *) => {
         {
             let pid = $pid;
             let addr = $addr;

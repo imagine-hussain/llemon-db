@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 
-use libc::size_t;
-
 use crate::breakpoint::Breakpoint;
 use crate::prelude::*;
 use crate::ptrace;
@@ -75,5 +73,16 @@ impl Target {
 
     pub fn pid(&self) -> Pid {
         self.pid
+    }
+
+    pub fn kill(&mut self) -> Result<(), ()> {
+        unsafe {
+            // TODO: Error check here, this is fallible
+            match libc::kill(self.pid.0, libc::SIGKILL) {
+                -1 => Err(()),
+                0 => Ok(()),
+                _ => unreachable!("libc should only return 0 or -1 for lib::kill"),
+            }
+        }
     }
 }
