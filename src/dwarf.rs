@@ -94,6 +94,11 @@ where
     Ok(())
 }
 
+fn find_function_locations(dwarf: &mut DwarfInfo) -> Result<(), gimli::Error> {
+
+    Ok(())
+}
+
 impl Default for Endianness {
     fn default() -> Self {
         Self::native()
