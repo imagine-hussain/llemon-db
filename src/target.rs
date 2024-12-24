@@ -75,11 +75,11 @@ impl Target {
         self.pid
     }
 
-    pub fn kill(&mut self) -> Result<(), ()> {
+    pub fn kill(&mut self) -> Result<(), &'static str> {
         unsafe {
             // TODO: Error check here, this is fallible
             match libc::kill(self.pid.0, libc::SIGKILL) {
-                -1 => Err(()),
+                -1 => Err("Could not kill process"),
                 0 => Ok(()),
                 _ => unreachable!("libc should only return 0 or -1 for lib::kill"),
             }

@@ -37,7 +37,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             .read_line(&mut input)
             .expect("Failed to read line");
 
-        run_command(&mut target, &input)?;
+        if let Err(e) = run_command(&mut target, &input) {
+            println!("Error: {e}");
+        };
     }
 }
 
@@ -50,19 +52,20 @@ fn run_command(target: &mut target::Target, line: &str) -> Result<(), Box<dyn Er
     let child_pid = target.pid();
 
     match command {
-        "continue" | "c" => target.continue_process().unwrap(),
+        "continue" | "c" => target.continue_process()?,
         "break" => {
             let addr_raw = inp.next().expect("Give address");
-            let addr = isize::from_str_radix(addr_raw, 16).unwrap();
-            target.add_breakpoint_at(addr).unwrap();
+            let addr = isize::from_str_radix(addr_raw, 16)?;
+            target.add_breakpoint_at(addr)?;
         }
         "exit" => {
-            target.kill().unwrap();
+            target.kill()?;
         }
         "register" | "reg" => match inp.next() {
             Some("get" | "read" | "r") => {
+                let register_name = inp.next().ok_or("Expecting register name to read")?;
                 let reg =
-                    registers::Register::from_str(inp.next().unwrap().to_uppercase().as_str())?;
+                    registers::Register::from_str(register_name.to_uppercase().as_str())?;
 
                 let value = ptrace::get_reg(child_pid, reg)?;
                 println!("Register has value: {value:x} = {value}");
@@ -103,7 +106,7 @@ fn run_command(target: &mut target::Target, line: &str) -> Result<(), Box<dyn Er
                 None => (addr_and_type, "i64"),
             };
             let addr: isize = addr_str.parse()?;
-            let value_str = inp.next().unwrap();
+            let value_str = inp.next().ok_or("Expecting value to write")?;
 
             parsetype_and_poke!(
                 value_str, typename, child_pid, addr, i32, u32, i64, u64, char, bool, u8, i8,

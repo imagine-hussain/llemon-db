@@ -1,7 +1,9 @@
 use gimli::Dwarf;
 use object::{self, Object, ObjectSection};
 use std::error::Error;
+use std::io::read_to_string;
 use std::sync::Arc;
+use libc::strcasecmp;
 use crate::mmap;
 
 const EMPTY_ARR: [u8; 0] = [];
