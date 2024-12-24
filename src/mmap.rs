@@ -1,8 +1,5 @@
-use std::os::fd::AsRawFd;
-use std::ptr::null_mut;
-use std::slice;
 use libc;
-use object::ReadCacheOps;
+use std::os::fd::AsRawFd;
 
 pub struct Mmap {
     data: *mut u8,
@@ -35,10 +32,10 @@ impl Mmap {
 
         let data = s.data;
         let len = s.len;
-        s.data = null_mut();
+        s.data = std::ptr::null_mut();
 
         unsafe {
-            slice::from_raw_parts(data, len)
+            std::slice::from_raw_parts(data, len)
         }
     }
 

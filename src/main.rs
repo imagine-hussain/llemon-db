@@ -6,7 +6,6 @@ use std::{
     process::Command,
     str::FromStr,
 };
-use libc::isdigit;
 
 pub mod breakpoint;
 pub mod dwarf;
@@ -18,7 +17,6 @@ pub mod target;
 pub mod mmap;
 
 use prelude::*;
-use crate::dwarf::{DwarfInfo, StaticEndianSlice};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut input = String::new();
@@ -26,10 +24,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut target = launch_traceable(Command::new("./hello")).unwrap();
     let child_pid = target.pid();
     println!("Attaching to program with pid {}", child_pid.0);
-
-    let mut raw_dwarf = dwarf::read_dwarf("./hello").map_err(|e| dbg!(e))?;
-    dwarf::process_dwarf_test::<StaticEndianSlice>(&mut raw_dwarf).map_err(|e| dbg!(e)).unwrap();
-    let mut dwinfo = dwarf::DwarfInfo::new(raw_dwarf);
 
     loop {
         print!(">>> ");
@@ -39,13 +33,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             .read_line(&mut input)
             .expect("Failed to read line");
 
-        if let Err(e) = run_command(&mut target, &mut dwinfo, &input) {
+        if let Err(e) = run_command(&mut target, &input) {
             println!("Error: {e}");
         };
     }
 }
 
-fn run_command(target: &mut target::Target, dwinfo: &mut DwarfInfo, line: &str) -> Result<(), Box<dyn Error>> {
+fn run_command(target: &mut target::Target, line: &str) -> Result<(), Box<dyn Error>> {
     let mut inp = line.split_whitespace();
     let command = match inp.next() {
         Some(c) => c,

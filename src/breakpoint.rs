@@ -77,6 +77,4 @@ impl Breakpoint {
 
         Ok(())
     }
-
-    pub fn read_word(addr: usize) {}
 }
