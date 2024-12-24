@@ -41,7 +41,7 @@ impl Breakpoint {
 
         let word_at_addr = ptrace::peekdata(self.pid, self.addr)?;
 
-        let mut bytes_at_addr = word_at_addr.to_le_bytes();
+        let mut bytes_at_addr = word_at_addr.to_ne_bytes();
 
         println!(
             "Enabling break at 0x{:x} with data {:x}",
@@ -55,7 +55,7 @@ impl Breakpoint {
             *bytes_at_addr.get_unchecked_mut(0) = Self::INT3_INSTRUCTION;
         }
 
-        let word_at_addr_with_int3 = i64::from_le_bytes(bytes_at_addr);
+        let word_at_addr_with_int3 = i64::from_ne_bytes(bytes_at_addr);
         ptrace::pokedata(self.pid, self.addr, word_at_addr_with_int3)?;
 
         self.enabled = true;
@@ -68,11 +68,11 @@ impl Breakpoint {
         let data = ptrace::peekdata(self.pid, self.addr)?;
         let old_byte = self.replacing_byte.take().expect("Was enabled");
 
-        let mut bytes = data.to_le_bytes();
+        let mut bytes = data.to_ne_bytes();
         unsafe {
             *bytes.get_unchecked_mut(0) = old_byte;
         }
-        let new_data = i64::from_le_bytes(bytes);
+        let new_data = i64::from_ne_bytes(bytes);
         ptrace::pokedata(self.pid, self.addr, new_data)?;
 
         Ok(())
