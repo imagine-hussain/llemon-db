@@ -1,9 +1,7 @@
-use gimli::{DW_AT_name, Dwarf};
+use std::collections::HashMap;
+use gimli;
 use object::{self, Object, ObjectSection};
 use std::error::Error;
-use std::io::read_to_string;
-use std::sync::Arc;
-use libc::strcasecmp;
 use crate::mmap;
 
 const EMPTY_ARR: [u8; 0] = [];
@@ -30,9 +28,33 @@ impl gimli::Endianity for Endianness {
 }
 
 pub type StaticEndianSlice = gimli::EndianSlice<'static, Endianness>;
-pub type DwarfInfo = Dwarf<StaticEndianSlice>;
+pub type Dwarf = gimli::Dwarf<StaticEndianSlice>;
 
-pub fn read_dwarf(filename: &str) -> Result<DwarfInfo, Box<dyn Error>> {
+pub struct DwarfInfo {
+    dwarf: Dwarf,
+    function_cache: HashMap<String, Vec<isize>>,
+}
+
+impl DwarfInfo {
+    pub fn new(dwarf: Dwarf) -> Self {
+        Self {
+            dwarf,
+            function_cache: HashMap::new(),
+        }
+    }
+
+    pub fn function_addresses(&mut self, function: &str) -> Result<Vec<isize>, gimli::Error> {
+        if let Some(addresses) = self.function_cache.get(function).cloned() {
+            return Ok(addresses);
+        }
+        let addresses: Vec<isize> = function_names_to_addresses(&mut self.dwarf, function)?;
+
+        self.function_cache.insert(function.to_string(), addresses);
+        Ok(self.function_cache.get(function).expect("Just inserted").clone())
+    }
+}
+
+pub fn read_dwarf(filename: &str) -> Result<Dwarf, Box<dyn Error>> {
     let mut file = std::fs::File::open(filename)?;
 
     let mapping = unsafe { mmap::Mmap::map(&mut file) };
@@ -44,7 +66,6 @@ pub fn read_dwarf(filename: &str) -> Result<DwarfInfo, Box<dyn Error>> {
     let dwarf = gimli::Dwarf::load(|id| {
         match elf.section_by_name(id.name()) {
             Some(section) => Ok(gimli::EndianSlice::new(section.data()?, endianness)),
-            // Some(section) => section.data(),
             None => Ok(gimli::EndianSlice::new(&EMPTY_ARR, endianness)),
         }
     });
@@ -52,11 +73,7 @@ pub fn read_dwarf(filename: &str) -> Result<DwarfInfo, Box<dyn Error>> {
     dwarf
 }
 
-fn identity<T>(t: T) -> T {
-    t
-}
-
-pub fn process_dwarf<R>(dwarf: &mut DwarfInfo) -> Result<(), gimli::Error>
+pub fn process_dwarf_test<R>(dwarf: &mut Dwarf) -> Result<(), gimli::Error>
 where
     R: gimli::Reader + Clone,
 {
@@ -68,10 +85,9 @@ where
 
     while let Some(unit_header) = units.next().unwrap() {
         let unit = dwarf.unit(unit_header)?;
-        let abbrev = Arc::clone(&unit.abbreviations);
 
         let mut entries = unit.entries();
-        while let Some((_, dbg_entry)) = entries.next_dfs().unwrap() {
+        while let Some((_, dbg_entry)) = entries.next_dfs()? {
             if let Some(attr) = dbg_entry.attr_value(gimli::DW_AT_name)? {
                 match dwarf.attr_string(&unit, attr) {
                     Ok(name) => {
@@ -91,7 +107,7 @@ where
     Ok(())
 }
 
-pub fn function_names_to_addresses(dwarf: &mut DwarfInfo, function: &str) -> Result<Vec<isize>, gimli::Error> {
+pub fn function_names_to_addresses(dwarf: &mut Dwarf, function: &str) -> Result<Vec<isize>, gimli::Error> {
     let mut units = dwarf.units();
     let mut addresses = Vec::new();
 
@@ -104,7 +120,7 @@ pub fn function_names_to_addresses(dwarf: &mut DwarfInfo, function: &str) -> Res
                 continue;
             }
             // Check the name directly or via DW_AT_abstract_origin
-            let Some(attr) = entry.attr_value(DW_AT_name)? else { continue; };
+            let Some(attr) = entry.attr_value(gimli::DW_AT_name)? else { continue; };
             let name: StaticEndianSlice = dwarf.attr_string(&unit, attr)?;
 
             // Regular function case
@@ -115,7 +131,7 @@ pub fn function_names_to_addresses(dwarf: &mut DwarfInfo, function: &str) -> Res
                     = entry.attr_value(gimli::DW_AT_abstract_origin)?
                 {
                     let origin_entry = unit.entry(abstract_origin)?;
-                    if let Some(attr) = origin_entry.attr_value(DW_AT_name)? {
+                    if let Some(attr) = origin_entry.attr_value(gimli::DW_AT_name)? {
                         let name = dwarf.attr_string(&unit, attr)?;
                         name_matches = name.to_string_lossy() == function;
                     }

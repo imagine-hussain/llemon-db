@@ -6,6 +6,7 @@ use std::{
     process::Command,
     str::FromStr,
 };
+use libc::isdigit;
 
 pub mod breakpoint;
 pub mod dwarf;
@@ -26,8 +27,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let child_pid = target.pid();
     println!("Attaching to program with pid {}", child_pid.0);
 
-    let mut dwinfo = dwarf::read_dwarf("./hello").map_err(|e| dbg!(e))?;
-    dwarf::process_dwarf::<StaticEndianSlice>(&mut dwinfo).map_err(|e| dbg!(e)).unwrap();
+    let mut raw_dwarf = dwarf::read_dwarf("./hello").map_err(|e| dbg!(e))?;
+    dwarf::process_dwarf_test::<StaticEndianSlice>(&mut raw_dwarf).map_err(|e| dbg!(e)).unwrap();
+    let mut dwinfo = dwarf::DwarfInfo::new(raw_dwarf);
 
     loop {
         print!(">>> ");
@@ -54,12 +56,24 @@ fn run_command(target: &mut target::Target, dwinfo: &mut DwarfInfo, line: &str) 
     match command {
         "continue" | "c" => target.continue_process()?,
         "break" => {
-            let addr_raw = inp.next().expect("Give address");
-            let addr = isize::from_str_radix(addr_raw, 16)?;
-            target.add_breakpoint_at(addr)?;
+            // break <address|function_name>
+            let location = inp.next().expect("Give location to add the breakpoint");
+            if location.starts_with("0x") {
+                let addr = isize::from_str_radix(location, 16)?;
+                target.add_breakpoint_at(addr)?;
+            }
+            else if location.chars().all(|c| c.is_ascii_digit()) {
+                let addr = isize::from_str_radix(location, 10)?;
+                target.add_breakpoint_at(addr)?;
+            } else {
+                let function_name = location;
+                target.add_breakpoint_at_function(function_name)?;
+                println!("Added breakpoint at function {function_name}");
+            }
         }
         "exit" => {
             target.kill()?;
+            std::process::exit(0);
         }
         "register" | "reg" => match inp.next() {
             Some("get" | "read" | "r") => {
@@ -116,7 +130,7 @@ fn run_command(target: &mut target::Target, dwinfo: &mut DwarfInfo, line: &str) 
         "locate" => {
             // locate <functionname>
             let function_name = inp.next().ok_or("Require functionname")?;
-            let locations = dwarf::function_names_to_addresses(dwinfo, function_name)?;
+            let locations = target.dwinfo.function_addresses(function_name)?;
             if locations.is_empty() {
                 println!("No locations found for {function_name}");
             }

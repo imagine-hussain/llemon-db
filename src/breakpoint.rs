@@ -44,7 +44,7 @@ impl Breakpoint {
         let mut bytes_at_addr = word_at_addr.to_le_bytes();
 
         println!(
-            "Setting break at {:x} with data {:x}",
+            "Enabling break at 0x{:x} with data {:x}",
             self.addr, word_at_addr
         );
         let lowest_byte = unsafe { *bytes_at_addr.get_unchecked(0) };

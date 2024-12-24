@@ -1,4 +1,5 @@
 use crate::{ptrace, target::Target};
+use crate::dwarf;
 
 use std::{ffi, os::unix::process::CommandExt, process};
 
@@ -9,8 +10,13 @@ pub const NULLVOID: *const ffi::c_void = std::ptr::null::<ffi::c_void>();
 
 pub fn launch_traceable(mut command: process::Command) -> Result<Target, i32> {
     match fork::fork()? {
-        fork::Fork::Parent(child_pid) => Ok(Target::from_pid(Pid(child_pid))),
-        fork::Fork::Child => {
+        fork::Fork::Parent(child_pid) => {
+            let program = command.get_program();
+            let dwarf = dwarf::read_dwarf(program.to_str().unwrap()).unwrap();
+            let dwinfo = dwarf::DwarfInfo::new(dwarf);
+            Ok(Target::new(Pid(child_pid), dwinfo))
+        },
+    fork::Fork::Child => {
             ptrace::trace_me();
             // execute the other program (inplace)
             command.exec();

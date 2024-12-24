@@ -4,8 +4,9 @@
 
 - [x] Attach and run
 - [x] Breakpoint at address
-- [ ] Breakpoint at function
+- [x] Breakpoint at function
     - [ ] Supports inlined functions
+      - Done but not tested
 - [ ] Breakpoint at specific line
 
 ## Registers
