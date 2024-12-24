@@ -94,7 +94,7 @@ where
     Ok(())
 }
 
-fn find_function_locations(dwarf: &mut DwarfInfo) -> Result<(), gimli::Error> {
+fn function_names_to_addresses(dwarf: &mut DwarfInfo) -> Result<(), gimli::Error> {
 
     Ok(())
 }

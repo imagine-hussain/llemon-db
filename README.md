@@ -17,3 +17,9 @@
 - [x] Continue till signal or breakpoint
 - [ ] Step (ASM)
 - [ ] Continue for one source-level step
+
+## Source Info
+- [ ] Current function / line
+  - [ ] Support inlined functions
+- [ ] Show surrounding source information
+
