@@ -17,7 +17,7 @@ pub mod target;
 pub mod mmap;
 
 use prelude::*;
-use crate::dwarf::StaticEndianSlice;
+use crate::dwarf::{DwarfInfo, StaticEndianSlice};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut input = String::new();
@@ -37,13 +37,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             .read_line(&mut input)
             .expect("Failed to read line");
 
-        if let Err(e) = run_command(&mut target, &input) {
+        if let Err(e) = run_command(&mut target, &mut dwinfo, &input) {
             println!("Error: {e}");
         };
     }
 }
 
-fn run_command(target: &mut target::Target, line: &str) -> Result<(), Box<dyn Error>> {
+fn run_command(target: &mut target::Target, dwinfo: &mut DwarfInfo, line: &str) -> Result<(), Box<dyn Error>> {
     let mut inp = line.split_whitespace();
     let command = match inp.next() {
         Some(c) => c,
@@ -100,7 +100,7 @@ fn run_command(target: &mut target::Target, line: &str) -> Result<(), Box<dyn Er
         }
         "write" => {
             // write <addr>(:type)? <value>
-            let addr_and_type = inp.next().expect("Give address, optionally give a type");
+            let addr_and_type = inp.next().ok_or("Give address, optionally give a type")?;
             let (addr_str, typename) = match addr_and_type.split_once(':') {
                 Some((addr, ty)) => (addr, ty),
                 None => (addr_and_type, "i64"),
@@ -112,6 +112,19 @@ fn run_command(target: &mut target::Target, line: &str) -> Result<(), Box<dyn Er
                 value_str, typename, child_pid, addr, i32, u32, i64, u64, char, bool, u8, i8,
                 usize, isize, i16, u16, f32, f64, i128, u128
             );
+        }
+        "locate" => {
+            // locate <functionname>
+            let function_name = inp.next().ok_or("Require functionname")?;
+            let locations = dwarf::function_names_to_addresses(dwinfo, function_name)?;
+            if locations.is_empty() {
+                println!("No locations found for {function_name}");
+            }
+            let base_address = target.get_base_address()?;
+            for location in locations {
+                let real_location = location + base_address as isize;
+                println!("0x{location:x} + 0x{base_address:x} = {real_location:x}");
+            }
         }
         _ => {
             println!("Dont know command: {command}");

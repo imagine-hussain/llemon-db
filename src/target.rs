@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-
+use std::io::BufRead;
 use crate::breakpoint::Breakpoint;
 use crate::prelude::*;
 use crate::ptrace;
@@ -85,4 +85,26 @@ impl Target {
             }
         }
     }
-}
+
+    // TODO: This should be cached to avoid reopening this file
+    pub fn get_base_address(&mut self) -> std::io::Result<u64> {
+        // Open the /proc/[pid]/maps file
+        let path = format!("/proc/{}/maps", self.pid.0);
+        let file = std::fs::File::open(path)?;
+
+        // Read the file line by line
+        let mut bufreader = std::io::BufReader::new(file);
+        for line in bufreader.lines() {
+            let line = line?;
+
+            // The base address is in the first column and is the first part of the line
+            if let Some(address_str) = line.split_whitespace().next() {
+                if let Ok(address) = u64::from_str_radix(address_str.split('-').next().unwrap(), 16) {
+                    return Ok(address);
+                }
+            }
+        }
+
+        // If no base address is found, return an error
+        Err(std::io::Error::new(std::io::ErrorKind::NotFound, "Base address not found in mapping file"))
+    }}

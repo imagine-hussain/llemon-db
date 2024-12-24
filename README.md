@@ -22,4 +22,5 @@
 - [ ] Current function / line
   - [ ] Support inlined functions
 - [ ] Show surrounding source information
+- [ ] Function name to address
 
