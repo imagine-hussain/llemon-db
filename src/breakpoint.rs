@@ -4,7 +4,7 @@ use crate::ptrace;
 #[derive(Debug, Clone, Hash)]
 pub struct Breakpoint {
     pid: Pid,
-    addr: isize,
+    addr: u64,
     enabled: bool,
     replacing_byte: Option<u8>,
 }
@@ -14,7 +14,7 @@ impl Breakpoint {
     /// TODO: Allow arm as well using `cfg` flags
     pub const INT3_INSTRUCTION: u8 = 0xCC;
 
-    pub fn new(pid: Pid, addr: isize) -> Self {
+    pub fn new(pid: Pid, addr: u64) -> Self {
         Self {
             pid,
             addr,
@@ -23,7 +23,7 @@ impl Breakpoint {
         }
     }
 
-    pub fn new_enabled(pid: Pid, addr: isize) -> Result<Self, ptrace::Error> {
+    pub fn new_enabled(pid: Pid, addr: u64) -> Result<Self, ptrace::Error> {
         let mut breakpoint = Self::new(pid, addr);
         breakpoint.enable()?;
         Ok(breakpoint)
@@ -44,8 +44,8 @@ impl Breakpoint {
         let mut bytes_at_addr = word_at_addr.to_ne_bytes();
 
         println!(
-            "Enabling break at 0x{:x} with data {:x}",
-            self.addr, word_at_addr
+            "Enabling break at 0x{:x} with data {:02x?}",
+            self.addr, word_at_addr.to_le_bytes()
         );
         let lowest_byte = unsafe { *bytes_at_addr.get_unchecked(0) };
         self.replacing_byte = Some(lowest_byte);
@@ -75,6 +75,7 @@ impl Breakpoint {
         let new_data = i64::from_ne_bytes(bytes);
         ptrace::pokedata(self.pid, self.addr, new_data)?;
 
+        self.enabled = false;
         Ok(())
     }
 }

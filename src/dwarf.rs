@@ -1,8 +1,8 @@
-use std::collections::HashMap;
+use crate::mmap;
 use gimli;
 use object::{self, Object, ObjectSection};
+use std::collections::HashMap;
 use std::error::Error;
-use crate::mmap;
 
 const EMPTY_ARR: [u8; 0] = [];
 
@@ -31,8 +31,8 @@ pub type StaticEndianSlice = gimli::EndianSlice<'static, Endianness>;
 pub type Dwarf = gimli::Dwarf<StaticEndianSlice>;
 
 pub struct DwarfInfo {
-    dwarf: Dwarf,
-    function_cache: HashMap<String, Vec<isize>>,
+    pub dwarf: Dwarf,
+    function_cache: HashMap<String, Vec<u64>>,
 }
 
 impl DwarfInfo {
@@ -43,14 +43,19 @@ impl DwarfInfo {
         }
     }
 
-    pub fn function_addresses(&mut self, function: &str) -> Result<Vec<isize>, gimli::Error> {
+    pub fn function_addresses(&mut self, function: &str) -> Result<Vec<u64>, gimli::Error> {
         if let Some(addresses) = self.function_cache.get(function).cloned() {
             return Ok(addresses);
         }
-        let addresses: Vec<isize> = function_names_to_addresses(&mut self.dwarf, function)?;
+        let addresses = function_names_to_addresses(&mut self.dwarf, function)?;
+        dbg!(&addresses);
 
         self.function_cache.insert(function.to_string(), addresses);
-        Ok(self.function_cache.get(function).expect("Just inserted").clone())
+        Ok(self
+            .function_cache
+            .get(function)
+            .expect("Just inserted")
+            .clone())
     }
 }
 
@@ -63,11 +68,9 @@ pub fn read_dwarf(filename: &str) -> Result<Dwarf, Box<dyn Error>> {
     let elf = object::File::parse(mmap_slice)?;
     let endianness = Endianness::from(elf.endianness());
 
-    let dwarf = gimli::Dwarf::load(|id| {
-        match elf.section_by_name(id.name()) {
-            Some(section) => Ok(gimli::EndianSlice::new(section.data()?, endianness)),
-            None => Ok(gimli::EndianSlice::new(&EMPTY_ARR, endianness)),
-        }
+    let dwarf = gimli::Dwarf::load(|id| match elf.section_by_name(id.name()) {
+        Some(section) => Ok(gimli::EndianSlice::new(section.data()?, endianness)),
+        None => Ok(gimli::EndianSlice::new(&EMPTY_ARR, endianness)),
     });
 
     dwarf
@@ -107,50 +110,85 @@ where
     Ok(())
 }
 
-pub fn function_names_to_addresses(dwarf: &mut Dwarf, function: &str) -> Result<Vec<isize>, gimli::Error> {
+pub fn function_names_to_addresses(
+    dwarf: &mut Dwarf,
+    function: &str,
+) -> Result<Vec<u64>, gimli::Error> {
     let mut units = dwarf.units();
     let mut addresses = Vec::new();
+
+    let mut add_entry_address = |entry: &gimli::DebuggingInformationEntry<StaticEndianSlice>|
+     -> Result<(), gimli::Error> {
+        if let Some(gimli::AttributeValue::Addr(addr)) = entry.attr_value(gimli::DW_AT_low_pc)? {
+            addresses.push(addr);
+        }
+        Ok(())
+    };
 
     while let Some(unit_header) = units.next()? {
         let unit = dwarf.unit(unit_header)?;
         // Traverse the DIEs
         let mut entries = unit.entries();
         while let Some((_, entry)) = entries.next_dfs()? {
-            if entry.tag() != gimli::DW_TAG_subprogram && entry.tag() != gimli::DW_TAG_inlined_subroutine {
-                continue;
-            }
-            // Check the name directly or via DW_AT_abstract_origin
-            let Some(attr) = entry.attr_value(gimli::DW_AT_name)? else { continue; };
-            let name: StaticEndianSlice = dwarf.attr_string(&unit, attr)?;
+            match entry.tag() {
+                gimli::DW_TAG_subprogram => {
+                    // A fully fledged function *should* be named
+                    let Some(attr) = entry.attr_value(gimli::DW_AT_name)? else {
+                        println!("noname function");
+                        continue;
+                    };
+                    let name: StaticEndianSlice = dwarf.attr_string(&unit, attr)?;
 
-            // Regular function case
-            let mut name_matches = name.to_string_lossy() == function;
-            // Inlined case leads to abstract origin
-            if !name_matches {
-                if let Some(gimli::AttributeValue::UnitRef(abstract_origin))
-                    = entry.attr_value(gimli::DW_AT_abstract_origin)?
-                {
-                    let origin_entry = unit.entry(abstract_origin)?;
-                    if let Some(attr) = origin_entry.attr_value(gimli::DW_AT_name)? {
-                        let name = dwarf.attr_string(&unit, attr)?;
-                        name_matches = name.to_string_lossy() == function;
+                    if name.to_string_lossy() == function {
+                        add_entry_address(entry)?;
                     }
                 }
-            }
-            if !name_matches { continue; }
-
-            // If name matches, get the address
-            if let Some(attr) = entry.attr_value(gimli::DW_AT_low_pc)? {
-                if let gimli::AttributeValue::Addr(addr) = attr {
-                    addresses.push(addr as isize);
+                gimli::DW_TAG_inlined_subroutine => {
+                    // Inlined functions will have abstract origin we need to look up to find name
+                    if let Some(gimli::AttributeValue::UnitRef(abstract_origin)) =
+                        entry.attr_value(gimli::DW_AT_abstract_origin)?
+                    {
+                        let origin_entry = unit.entry(abstract_origin)?;
+                        if let Some(attr) = origin_entry.attr_value(gimli::DW_AT_name)? {
+                            if dwarf.attr_string(&unit, attr)?.to_string_lossy() != function {
+                                continue;
+                            }
+                            add_entry_address(entry)?;
+                        }
+                    }
                 }
+                _ => (),
             }
         }
     }
 
-
     Ok(addresses)
 }
+
+// pub fn address_to_function(dwarf: &mut Dwarf, pc: isize) -> Result<(), gimli::Error> {
+//     let mut units = dwarf.units();
+//
+//     while let Some(unit_header) = units.next()? {
+//         let unit = dwarf.unit(unit_header)?;
+//         // Traverse the DIEs
+//         let mut entries = unit.entries();
+//         while let Some((_, entry)) = entries.next_dfs()? {
+//             // Note that this only deals with top-level functions
+//             // This won't do anything for inlined entries
+//             if entry.tag() != gimli::DW_TAG_subprogram {
+//                 continue;
+//             }
+//         let Some(attr_lo) = entry.attr_value(gimli::DW_AT_low_pc)? else { continue; };
+//             let gimli::AttributeValue::Addr(addr) = attr_lo else { continue; };
+//             if addr as isize == pc {
+//                 println!("Found function at address: {:?}", pc);
+//                 return Ok(());
+//             }
+//         }
+//     }
+//
+//     todo!()
+// }
 
 impl Default for Endianness {
     fn default() -> Self {

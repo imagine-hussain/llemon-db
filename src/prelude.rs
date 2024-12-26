@@ -44,7 +44,11 @@ macro_rules! peektype_and_print {
                 $(
                     stringify!($ty) => {
                         let val: $ty = ptrace::peekdata_as(pid, addr).unwrap();
-                        println!("{val}");
+                        println!(
+                            "{}, {:02x?}",
+                            val,
+                            val.to_ne_bytes()
+                        );
                     }
                 ),*
                 provided_typename => {
@@ -80,3 +84,15 @@ macro_rules! parsetype_and_poke {
     };
 
 }
+
+pub fn parse_address(s: &str) -> Result<u64, std::num::ParseIntError> {
+    if let Some(s) = s.strip_prefix("0x") {
+        println!("hex s: {}", s);
+        Ok(u64::from_str_radix(s, 16)?)
+    } else {
+        println!("b10 s: {}", s);
+        Ok(u64::from_str_radix(s, 10)?)
+    }
+}
+
+pub fn ignore<T>(_: T) {}

@@ -59,7 +59,7 @@ pub fn trace_me() {
     };
 }
 
-pub fn peekdata(pid: Pid, addr: isize) -> Result<i64, Error> {
+pub fn peekdata(pid: Pid, addr: u64) -> Result<i64, Error> {
     clear_errno();
     let data = unsafe { libc::ptrace(libc::PTRACE_PEEKDATA, pid.0, addr, NULLVOID) };
     match check_errno() {
@@ -69,7 +69,7 @@ pub fn peekdata(pid: Pid, addr: isize) -> Result<i64, Error> {
 }
 
 
-pub fn peekdata_slice(pid: Pid, mut addr: isize, data: &mut [u8]) -> Result<(), Error> {
+pub fn peekdata_slice(pid: Pid, mut addr: u64, data: &mut [u8]) -> Result<(), Error> {
     let mut remaining = data;
 
     while !remaining.is_empty() {
@@ -84,13 +84,13 @@ pub fn peekdata_slice(pid: Pid, mut addr: isize, data: &mut [u8]) -> Result<(), 
         }
 
         remaining = &mut remaining[bytes_to_copy..];
-        addr += bytes_to_copy as isize;
+        addr += bytes_to_copy as u64;
     }
 
     Ok(())
 }
 
-pub fn peekdata_as<T: Sized>(pid: Pid, addr: isize) -> Result<T, Error> {
+pub fn peekdata_as<T: Sized>(pid: Pid, addr: u64) -> Result<T, Error> {
     let len: usize = std::mem::size_of::<T>();
     let mut t = MaybeUninit::<T>::uninit();
     
@@ -108,7 +108,7 @@ pub fn peekdata_as<T: Sized>(pid: Pid, addr: isize) -> Result<T, Error> {
 }
 
 
-pub fn pokedata(pid: Pid, addr: isize, data: i64) -> Result<(), Error> {
+pub fn pokedata(pid: Pid, addr: u64, data: i64) -> Result<(), Error> {
     clear_errno();
     let res = unsafe { libc::ptrace(libc::PTRACE_POKEDATA, pid, addr, data) };
     match res {
@@ -118,7 +118,7 @@ pub fn pokedata(pid: Pid, addr: isize, data: i64) -> Result<(), Error> {
 }
 
 
-pub fn pokedata_slice(pid: Pid, mut addr: isize, data: &[u8]) -> Result<(), Error> {
+pub fn pokedata_slice(pid: Pid, mut addr: u64, data: &[u8]) -> Result<(), Error> {
     let mut remaining = data;
 
     while !remaining.is_empty() {
@@ -142,13 +142,13 @@ pub fn pokedata_slice(pid: Pid, mut addr: isize, data: &[u8]) -> Result<(), Erro
         }
 
         remaining = &remaining[bytes_to_copy..];
-        addr += bytes_to_copy as isize;
+        addr += bytes_to_copy as u64;
     }
 
     Ok(())
 }
 
-pub fn pokedata_as<T: Sized>(pid: Pid, addr: isize, data: &T) -> Result<(), Error> {
+pub fn pokedata_as<T: Sized>(pid: Pid, addr: u64, data: &T) -> Result<(), Error> {
     let len = std::mem::size_of::<T>();
     let data_slice = unsafe {
         let underlying = data as *const T as *const u8;

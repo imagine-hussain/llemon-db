@@ -27,5 +27,6 @@ Cargo.lock
 
 # Sample targets
 hello
+hello3
 
 .idea/

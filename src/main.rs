@@ -20,10 +20,12 @@ use prelude::*;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut input = String::new();
+    let target_name = std::env::args().nth(1).unwrap_or_else(|| "./hello".to_string());
 
-    let mut target = launch_traceable(Command::new("./hello")).unwrap();
+    let mut target = launch_traceable(Command::new(target_name)).unwrap();
     let child_pid = target.pid();
     println!("Attaching to program with pid {}", child_pid.0);
+    dwarf::process_dwarf_test::<dwarf::StaticEndianSlice>(&mut target.dwinfo.dwarf).unwrap();
 
     loop {
         print!(">>> ");
@@ -48,16 +50,18 @@ fn run_command(target: &mut target::Target, line: &str) -> Result<(), Box<dyn Er
     let child_pid = target.pid();
 
     match command {
+        "d" => ignore(dbg!(&target)),
         "continue" | "c" => target.continue_process()?,
+        "stepi" | "si" => target.step_instruction()?,
         "break" => {
             // break <address|function_name>
-            let location = inp.next().expect("Give location to add the breakpoint");
+            let location = inp.next().ok_or("Give location to add the breakpoint")?;
             if location.starts_with("0x") {
-                let addr = isize::from_str_radix(location, 16)?;
+                let addr = u64::from_str_radix(location, 16)?;
                 target.add_breakpoint_at(addr)?;
             }
             else if location.chars().all(|c| c.is_ascii_digit()) {
-                let addr = isize::from_str_radix(location, 10)?;
+                let addr = u64::from_str_radix(location, 10)?;
                 target.add_breakpoint_at(addr)?;
             } else {
                 let function_name = location;
@@ -90,7 +94,7 @@ fn run_command(target: &mut target::Target, line: &str) -> Result<(), Box<dyn Er
                 let regs = ptrace::get_regs(child_pid)?;
                 registers::dump_user_regs(&regs);
             }
-            _ => todo!("invalid input"),
+            _ => return Err("invalid input".into()),
         },
         "read" => {
             // read <addr>(:<type>)?
@@ -99,10 +103,13 @@ fn run_command(target: &mut target::Target, line: &str) -> Result<(), Box<dyn Er
                 Some((addr, ty)) => (addr, ty),
                 None => (addr_and_type, "i64"),
             };
-            let addr: isize = addr_str.parse()?;
+            dbg!(addr_str, typename);
+            let addr: u64 = parse_address(addr_str)?;
+            dbg!(addr);
 
+            // TODO: add char, bool back
             peektype_and_print!(
-                typename, child_pid, addr, i32, u32, i64, u64, char, bool, u8, i8, usize, isize,
+                typename, child_pid, addr, i32, u32, i64, u64, u8, i8, usize, isize,
                 i16, u16, f32, f64, i128, u128
             );
         }
@@ -113,7 +120,7 @@ fn run_command(target: &mut target::Target, line: &str) -> Result<(), Box<dyn Er
                 Some((addr, ty)) => (addr, ty),
                 None => (addr_and_type, "i64"),
             };
-            let addr: isize = addr_str.parse()?;
+            let addr = parse_address(addr_str)?;
             let value_str = inp.next().ok_or("Expecting value to write")?;
 
             parsetype_and_poke!(
@@ -124,15 +131,20 @@ fn run_command(target: &mut target::Target, line: &str) -> Result<(), Box<dyn Er
         "locate" => {
             // locate <functionname>
             let function_name = inp.next().ok_or("Require functionname")?;
+
             let locations = target.dwinfo.function_addresses(function_name)?;
+            dbg!(&locations);
             if locations.is_empty() {
-                println!("No locations found for {function_name}");
+                println!("No locations found for \"{function_name}\"");
             }
             let base_address = target.get_base_address()?;
             for location in locations {
-                let real_location = location + base_address as isize;
+        let real_location = location + base_address;
                 println!("0x{location:x} + 0x{base_address:x} = {real_location:x}");
             }
+        }
+        "endianness" => {
+            println!("Native Endianness: {:?}", dwarf::Endianness::default());
         }
         _ => {
             println!("Dont know command: {command}");
