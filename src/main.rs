@@ -17,6 +17,7 @@ pub mod target;
 pub mod mmap;
 
 use prelude::*;
+use crate::dwarf::{find_function_at_pc, CodePoint};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut input = String::new();
@@ -50,10 +51,20 @@ fn run_command(target: &mut target::Target, line: &str) -> Result<(), Box<dyn Er
     let child_pid = target.pid();
 
     match command {
+        "where" => {
+            let pc = ptrace::get_reg(child_pid, registers::Register::pc())?;
+            let base = target.get_base_address()?;
+            match find_function_at_pc(&target.dwinfo.dwarf, pc, base)? {
+                None => println!("No function found at {pc:x}"),
+                Some(cp) => {
+                    println!("{}", cp);
+                }
+            }
+        },
         "d" => ignore(dbg!(&target)),
         "continue" | "c" => target.continue_process()?,
         "stepi" | "si" => target.step_instruction()?,
-        "break" => {
+        "break" | "b" => {
             // break <address|function_name>
             let location = inp.next().ok_or("Give location to add the breakpoint")?;
             if location.starts_with("0x") {
